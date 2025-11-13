@@ -4,3 +4,9 @@ lxml
 pandas
 tqdm
 colorama
+
+# Visualization & notebooks
+matplotlib
+seaborn
+plotly
+notebook

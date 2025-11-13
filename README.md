@@ -9,4 +9,8 @@ and saves them into CSV files, with images downloaded locally.
 ## Setup
 
 ```bash
+
 pip install -r requirements.txt
+'''
+
+#

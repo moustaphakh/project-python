@@ -8,6 +8,7 @@ from bs4 import BeautifulSoup
 import pandas as pd
 from tqdm import tqdm
 from colorama import Fore, Style, init
+import argparse
 
 init(autoreset=True)
 
@@ -27,6 +28,14 @@ HEADERS = {
 
 RATING_MAP = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
 
+def parse_args():
+    """Parse command-line arguments."""
+    parser = argparse.ArgumentParser(description="Scrape books.toscrape.com by category")
+    parser.add_argument("--categories", type=str, help="Comma-separated list of categories to scrape (e.g. 'Travel,Poetry')")
+    parser.add_argument("--max-pages", type=int, default=None, help="Limit number of pages per category for testing")
+    parser.add_argument("--delay", type=float, default=1.0, help="Delay between requests in seconds")
+    parser.add_argument("--outdir", type=str, default="outputs", help="Base output directory")
+    return parser.parse_args()
 
 def ensure_dir(path: Path):
     """Create directories safely (no error if already exists)."""

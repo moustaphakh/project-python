@@ -4,23 +4,26 @@ import requests
 from tqdm import tqdm
 import pandas as pd
 from colorama import Fore, init
-from settings import OUT_CSV_DIR, OUT_IMG_DIR
-from utils import ensure_dir, slugify, download_file
+from settings import BASE_URL, INDEX_URL, OUT_CSV_DIR, OUT_IMG_DIR, HEADERS
+from utils import ensure_dir, slugify, download_file, absolute_url
 from parsers import parse_category_page, parse_book_page, get_soup
 
 init(autoreset=True)
 
+
+# Defaults
+DEFAULT_OUTDIR = Path("outputs")
+
 def parse_args():
-    """Parse command-line arguments."""
     parser = argparse.ArgumentParser(description="Scrape books.toscrape.com")
     parser.add_argument("--categories", type=str, help="Comma-separated list of categories to scrape")
     parser.add_argument("--max-pages", type=int, default=None, help="Limit number of pages per category")
     parser.add_argument("--delay", type=float, default=1.0, help="Delay between requests")
-    parser.add_argument("--outdir", type=str, default="outputs", help="Base output directory")
+    parser.add_argument("--outdir", type=str, default=str(DEFAULT_OUTDIR), help="Base output directory")
     return parser.parse_args()
 
 def scrape_category_with_limit(session, category_name, category_url, max_pages=None):
-    """Scrape a category with optional page limit for testing."""
+    from settings import REQUEST_DELAY_SEC
     all_books = []
     next_page = category_url
     pages_scraped = 0
@@ -37,8 +40,10 @@ def scrape_category_with_limit(session, category_name, category_url, max_pages=N
         pages_scraped += 1
     return all_books
 
-def save_category_csv(category_name, data, outdir):
-    """Save scraped data into a CSV file per category."""
+def save_category_csv(category_name, data, outdir=None):
+    from settings import OUT_CSV_DIR
+    if outdir is None:
+        outdir = OUT_CSV_DIR
     ensure_dir(outdir)
     slug = slugify(category_name)
     path = outdir / f"category_{slug}.csv"
@@ -46,8 +51,10 @@ def save_category_csv(category_name, data, outdir):
     print(Fore.GREEN + f"[DONE] Saved CSV: {path}")
     return path
 
-def download_category_images(session, category_name, data, outdir):
-    """Download all book images in a category."""
+def download_category_images(session, category_name, data, outdir=None):
+    from settings import OUT_IMG_DIR
+    if outdir is None:
+        outdir = OUT_IMG_DIR
     slug = slugify(category_name)
     folder = outdir / slug
     ensure_dir(folder)
@@ -64,22 +71,46 @@ def download_category_images(session, category_name, data, outdir):
         except Exception as e:
             print(Fore.YELLOW + f"[WARN] Image failed {title}: {e}")
 
+def get_all_categories(session):
+    """Collect all category names and their URLs."""
+    soup = get_soup(session, INDEX_URL)
+    cats = {}
+    for a in soup.select("ul.nav.nav-list li a"):
+        name = a.get_text(strip=True)
+        if name.lower() == "books":
+            continue
+        cats[name] = absolute_url(INDEX_URL, a["href"])
+    return cats
+
 def main():
+    import settings
     args = parse_args()
 
-    global OUT_CSV_DIR, OUT_IMG_DIR
-    OUT_CSV_DIR = Path(args.outdir) / "csv"
-    OUT_IMG_DIR = Path(args.outdir) / "images"
-    ensure_dir(OUT_CSV_DIR)
-    ensure_dir(OUT_IMG_DIR)
+    # Update settings dynamically
+    settings.OUT_CSV_DIR = Path(args.outdir) / "csv"
+    settings.OUT_IMG_DIR = Path(args.outdir) / "images"
+    settings.REQUEST_DELAY_SEC = args.delay
+
+    ensure_dir(settings.OUT_CSV_DIR)
+    ensure_dir(settings.OUT_IMG_DIR)
 
     with requests.Session() as session:
-        categories = {"Travel": "https://books.toscrape.com/catalogue/category/books/travel_2/index.html"}
+        # Get all categories dynamically
+        categories = get_all_categories(session)
+
+        # Filter if requested
+        if args.categories:
+            selected = [c.strip() for c in args.categories.split(",")]
+            categories = {k: v for k, v in categories.items() if k in selected}
+
+        print(Fore.CYAN + f"[INFO] Found {len(categories)} categories: {', '.join(categories.keys())}")
+
         for cat_name, cat_url in categories.items():
             print(Fore.CYAN + f"[INFO] Starting category: {cat_name}")
             books = scrape_category_with_limit(session, cat_name, cat_url, args.max_pages)
-            save_category_csv(cat_name, books, OUT_CSV_DIR)
-            download_category_images(session, cat_name, books, OUT_IMG_DIR)
+            # pass explicit outdir values this took me so many tries to figure out
+            save_category_csv(cat_name, books, settings.OUT_CSV_DIR)
+            download_category_images(session, cat_name, books, settings.OUT_IMG_DIR)
             print(Fore.GREEN + f"[DONE] Finished category: {cat_name}\n")
 
 if __name__ == "__main__":

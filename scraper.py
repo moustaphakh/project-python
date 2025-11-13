@@ -6,9 +6,10 @@ from urllib.parse import urljoin
 import requests
 from bs4 import BeautifulSoup
 import pandas as pd
-from tqdm import tqdm
-from colorama import Fore, Style, init
+from tqdm import tqdm                     # For progress bars
+from colorama import Fore, Style, init    # For colored messages
 import argparse
+
 
 init(autoreset=True)
 
@@ -27,6 +28,7 @@ HEADERS = {
 }
 
 RATING_MAP = {"One": 1, "Two": 2, "Three": 3, "Four": 4, "Five": 5}
+
 
 def parse_args():
     """Parse command-line arguments."""
@@ -194,22 +196,53 @@ def download_category_images(session, category_name, data):
 
 
 def main():
+    args = parse_args()
+
+    global REQUEST_DELAY_SEC, OUT_CSV_DIR, OUT_IMG_DIR
+    REQUEST_DELAY_SEC = args.delay
+    OUT_CSV_DIR = Path(args.outdir) / "csv"
+    OUT_IMG_DIR = Path(args.outdir) / "images"
+
     ensure_dir(OUT_CSV_DIR)
     ensure_dir(OUT_IMG_DIR)
 
     with requests.Session() as session:
         categories = get_all_categories(session)
-        print(Fore.CYAN + f"[INFO] Found {len(categories)} categories.")
+        print(Fore.CYAN + f"[INFO] Found {len(categories)} categories total.")
+
+        # Filter categories if requested
+        if args.categories:
+            selected = [c.strip() for c in args.categories.split(",")]
+            categories = {k: v for k, v in categories.items() if k in selected}
+            print(Fore.CYAN + f"[INFO] Selected categories: {', '.join(categories.keys())}")
 
         for cat_name, cat_url in categories.items():
             print(Fore.CYAN + f"[INFO] Starting category: {cat_name}")
             try:
-                books = scrape_category(session, cat_name, cat_url)
+                books = scrape_category_with_limit(session, cat_name, cat_url, args.max_pages)
                 save_category_csv(cat_name, books)
                 download_category_images(session, cat_name, books)
                 print(Fore.GREEN + f"[DONE] Finished category: {cat_name}\n")
             except Exception as e:
                 print(Fore.RED + f"[ERROR] Skipping {cat_name}: {e}")
+
+def scrape_category_with_limit(session, category_name: str, category_url: str, max_pages: int = None):
+    """Scrape a category with optional page limit for testing."""
+    all_books = []
+    next_page = category_url
+    pages_scraped = 0
+    while next_page:
+        if max_pages is not None and pages_scraped >= max_pages:
+            break
+        book_urls, next_page = parse_category_page(session, next_page)
+        for book_url in tqdm(book_urls, desc=f"{Fore.CYAN}Scraping {category_name}", colour="cyan"):
+            try:
+                book = parse_book_page(session, book_url, category_name)
+                all_books.append(book)
+            except Exception as e:
+                print(Fore.YELLOW + f"[WARN] Failed {book_url}: {e}")
+        pages_scraped += 1
+    return all_books
 
 if __name__ == "__main__":
     main()

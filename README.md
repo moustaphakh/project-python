@@ -11,25 +11,26 @@ and saves them into CSV files, with images downloaded locally.
 ```bash
 pip install -r requirements.txt
 ```
-# How to use
+## How to use
 ```bash
 python scrape.py
 ```
-#Specific scraping
+## Specific scraping
 ```bash
 python scrape.py --categories Travel,Poetry
 ```
-#Limit number of pages
+## Limit number of pages
 ```bash
 python scrape.py --categories Travel --max-pages 1
 ```
-#Change the output folder
+## Change the output folder
 ```bash
 python scrape.py --outdir test_outputs
 ```
-#Combination of functions
+## Combination of functions
 ```bash
 python scrape.py --categories Travel --max-pages 1 --delay 2 --outdir test_outputs
 ```
+
 
 

@@ -23,6 +23,11 @@ python scrape.py --categories Travel,Poetry
 ```bash
 python scrape.py --categories Travel --max-pages 1
 ```
+## Change request delay
+```bash
+python scrape.py --delay 2
+```
+
 ## Change the output folder
 ```bash
 python scrape.py --outdir test_outputs
@@ -31,6 +36,7 @@ python scrape.py --outdir test_outputs
 ```bash
 python scrape.py --categories Travel --max-pages 1 --delay 2 --outdir test_outputs
 ```
+
 
 
 
